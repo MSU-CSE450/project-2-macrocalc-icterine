@@ -27,11 +27,17 @@ int main(int argc, char * argv[])
     exit(1);
   }
 
+
   // TO DO:  
   // PARSE input file to create Abstract Syntax Tree (AST).
   // EXECUTE the AST to run your program.
+
   Parser parser(in_file);
 
   
-  parser.print_tokens();
+  //parser.print_tokens();
+  parser.Parse();
+  parser.print_table();
+  
+  return 0;
 }
