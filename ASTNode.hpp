@@ -14,7 +14,10 @@ enum Type
     VARIABLE, // Contains information about the name of a variable in "token" field
     NUMBER, // Contains a literal number in "value" field
     BINARY_OPERATION, // Contains a binary operation + or - in a "token" field, and expressions in both left and right children
-    UNARY_OPERATION // Contains no useful information in its fields. It will have only a left child, the value of which we must negate 
+    UNARY_OPERATION, // Contains no useful information in its fields. It will have only a left child, the value of which we must negate 
+    UPDATE, // Updates existing variable
+    STATEMENT_BLOCK,
+    PRINT
   };
 class ASTNode {
 
@@ -22,9 +25,11 @@ private:
   
   Type type;
   emplex::Token token;
+  int var_unique_id;
   double value = 0;
   ASTNode* left = nullptr;
   ASTNode* right = nullptr;
+
 
   void error(std::string message, emplex::Token token)
     {
@@ -43,9 +48,21 @@ public:
   }
   ASTNode(Type type, double value) : ASTNode(type)
   {
-    this->value = value;
+    if (type == Type::VARIABLE)
+      var_unique_id = (int) value;
+    else
+      this->value = value;
     //std::cout << "Created NUMBER with a value " << value << std::endl;
     
+  }
+  ASTNode(Type type, ASTNode* left) : ASTNode(type)
+  {
+    this->left = left;
+  }
+
+  ASTNode(Type type, VarData varData) : ASTNode(type)
+  {
+    var_unique_id = varData.unique_id;
   }
   // CONSTRUCTORS, ETC HERE.
   // CAN SPECIFY NODE TYPE AND ANY NEEDED VALUES HERE OR USING OTHER FUNCTIONS.
@@ -65,6 +82,7 @@ public:
   double Run(SymbolTable & symbols) 
   { 
     double lvalue = 0, rvalue = 0;
+    int unique_id;
     std::string var_identifier{};
     switch (type)
     {
@@ -73,20 +91,16 @@ public:
         return value;
         break;
       case VARIABLE:
-        if (!symbols.HasVar(token.lexeme))
-        {
-          Utils::error("Variable not declared", token);
-        }
-        return symbols.GetValue(token.lexeme);
+        return symbols.GetValue(var_unique_id);
         break;
       case ASSIGNMENT:
-        var_identifier = left->getToken().lexeme;
+        unique_id = left->getVarId();
         if (right != nullptr)
         {
           rvalue = right->Run(symbols);
         }
         //std::cout << "Running node ASSIGNMENT: var " << var_identifier << " = " << rvalue << std::endl;
-        symbols.InitializeVar(var_identifier, rvalue);
+        symbols.UpdateVar(unique_id, rvalue);
         break;
       case UNARY_OPERATION:
         // UNARY node will has only one left child - value it has to negate
@@ -110,6 +124,10 @@ public:
             value = lvalue - rvalue;
             return lvalue - rvalue;
         }
+      case PRINT:
+        lvalue = left->Run(symbols);
+        std::cout << lvalue << std::endl;
+        break;
       default:
         error("Unknown token",token);
       
@@ -121,6 +139,11 @@ public:
   emplex::Token getToken()
   {
     return this->token;
+  }
+
+  int getVarId()
+  {
+    return this->var_unique_id;
   }
   ASTNode* getRight()
   {

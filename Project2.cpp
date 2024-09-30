@@ -19,6 +19,8 @@ int main(int argc, char * argv[])
     exit(1);
   }
 
+
+
   std::string filename = argv[1];
   
   std::ifstream in_file(filename);              // Load the input file
@@ -37,7 +39,7 @@ int main(int argc, char * argv[])
   
   //parser.print_tokens();
   parser.Parse();
-  parser.print_table();
+  //parser.print_table();
   
   return 0;
 }

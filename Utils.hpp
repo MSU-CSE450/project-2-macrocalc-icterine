@@ -11,4 +11,8 @@ public:
         std::cerr << "Error at line " << token.line_id << ": " << message << ", lexeme: " << token.lexeme << " (id " << token.id << ")" << std::endl;
         exit(1);
     }
+    static void error(std::string message)
+    {
+        std::cerr << "Error: " << message << std::endl;
+    }
 };

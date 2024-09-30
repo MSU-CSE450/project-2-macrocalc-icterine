@@ -4,24 +4,32 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "Utils.hpp"
+struct VarData {
+  double value;
+  int unique_id;
 
+  VarData(int unique_id)
+  {
+    this->unique_id = unique_id;
+  }
+  VarData(int unique_id, double value) : VarData(unique_id)
+  {
+    this->value = value;
+  }
+};
 class SymbolTable {
 private:
   // CODE TO STORE SCOPES AND VARIABLES HERE.
   
   // HINT: YOU CAN CONVERT EACH VARIABLE NAME TO A UNIQUE ID TO CLEANLY DEAL
   //       WITH SHADOWING AND LOOKING UP VARIABLES LATER.
-  std::vector<std::unordered_map<std::string, double>> scopes;
+  std::vector<std::unordered_map<std::string, int>> scopes;
+  std::vector<VarData> variables;
   int scopes_count = 0;
-  bool HasVarCurrentScope(std::string name)
-  {
-    // checks if variable exists only in the CURRENT scope
-    auto current_scope = GetCurrentScope();
-    if (current_scope.find(name) != current_scope.end())
-      return true;
-    return false;
-  }
-  std::unordered_map<std::string,double> GetCurrentScope()
+  int unique_id_increment = 0;
+
+  std::unordered_map<std::string,int> GetCurrentScope()
   {
     return scopes[scopes_count-1];
   }
@@ -31,10 +39,18 @@ public:
   {
     PushScope(); // initialize global scope
   }
+   bool HasVarInCurrentScope(std::string name)
+  {
+    // checks if variable exists only in the CURRENT scope
+    auto current_scope = GetCurrentScope();
+    if (current_scope.find(name) != current_scope.end())
+      return true;
+    return false;
+  }
   // FUNCTIONS TO MANAGE SCOPES (NEED BODIES FOR THESE IF YOU WANT TO USE THEM)
   void PushScope() 
   { 
-    std::unordered_map<std::string, double> scope;
+    std::unordered_map<std::string, int> scope;
     scopes.push_back(scope);
 
     scopes_count++;
@@ -67,61 +83,43 @@ public:
     return false;
   }
   
-  double GetValue(std::string name) const {
-    if (!HasVar(name))
+  double GetValue(int unique_id) const {
+    for (auto varData : variables)
     {
-      std::cerr << "Error: tried to access undefined variable " << name << std::endl;
-      exit(1);
+      if (unique_id == varData.unique_id)
+        return varData.value;
     }
+
+    // this block should be unreachable
+    return -99999;
+  }
+
+  int GetUniqueId(std::string& name)
+  {
     for (auto it = scopes.rbegin(); it != scopes.rend(); ++it)
     {
       auto found = it->find(name);
       if (found != it->end())
         return found->second;
     }
-
-    // this block should be unreachable
-    return -99999;
+    Utils::error("Could not find a variable " + name);
+    return -1;
   }
-  void InitializeVar(std::string name, double value = 0)
+  int InitializeVar(std::string name)
   { 
-    if (HasVarCurrentScope(name))
-    {
-      // check if variable already defined in the current scope. Example:
-      /*
-      Valid initialization:
-      {
-        var x = 20;
-        {
-          var x = 20; // ok - can init variable with the same name in inner scopes
-        }
-      }
-
-      Invalid initialization:
-      {
-        var x = 20;
-        var x = 50; // cannot initialize same variable in the same scope
-      }
-      */
-      std::cerr << "Error: tried to redefine variable " << name << std::endl;
-      exit(1);
-    }
     //std::cout << "Inserting " << name << " = " << value << " in scope " << scopes_count-1 << std::endl;
-    scopes[scopes_count-1].insert({name, value});
+    scopes[scopes_count-1].insert({name, unique_id_increment});
+    variables.push_back(VarData(unique_id_increment, 0));
+
+    return unique_id_increment++;
   }
 
-  size_t UpdateVar(std::string name, double value)
+  size_t UpdateVar(int unique_id, double value)
   { 
-    if (!HasVar(name))
+    for (auto &var : variables)
     {
-      std::cerr << "Error: tried accessing undefined variable " << name << std::endl;
-    }
-
-    for (auto it = scopes.rbegin(); it != scopes.rend(); ++it)
-    {
-      auto found = it->find(name);
-      if (found != it->end())
-        (*found).second = value;
+      if (unique_id == var.unique_id)
+        var.value = value;
     }
     return 0;
   }
@@ -129,15 +127,10 @@ public:
   void PrintTable()
   {
     int i =0;
-    std::cout << "DEBUG: printing SymbolTable by scopes:\n";
-    for (auto scope : scopes)
+    std::cout << "DEBUG: printing SymbolTable:\n";
+    for (VarData var : variables)
     {
-      std::cout << "Printing scope " << i << " \n";
-      for (auto pair : scope)
-      {
-        std::cout << "  " << pair.first << " = " << pair.second << std::endl;
-      }
-      i++;
+      std::cout << "    id = " << var.unique_id << ", value = " << var.value << std::endl;
     }
   }
 };

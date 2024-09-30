@@ -34,7 +34,12 @@ private:
         std::string identifier = tokens[token_id].lexeme;
 
         // left child of the assignment node will be a variable type
-        node->SetLeft(new ASTNode(Type::VARIABLE, tokens[token_id]));
+        if (table.HasVarInCurrentScope(identifier))
+            Utils::error("Tried to redefine varialbe", tokens[token_id]);
+
+        int unique_id = table.InitializeVar(identifier);
+        
+        node->SetLeft(new ASTNode(Type::VARIABLE, unique_id));
         ++token_id;
        
 
@@ -111,7 +116,12 @@ private:
         if (token_id < tokens.size() && tokens[token_id] == Lexer::ID_identifier)
         {
             // create a "VARIABLE" node and initialize "token" field with information about the variable
-            return new ASTNode(VARIABLE, tokens[token_id++]);
+            if (!table.HasVar(tokens[token_id].lexeme))
+                Utils::error("Variable not defined", tokens[token_id]);
+            
+            int unique_id = table.GetUniqueId(tokens[token_id].lexeme);
+            ++token_id;
+            return new ASTNode(VARIABLE, unique_id);
         }
 
 
@@ -153,6 +163,11 @@ public:
         }
     }
 
+    SymbolTable getSymbolTable()
+    {
+        return this->table;
+    }
+
     void Parse()
     {
         using namespace emplex;
@@ -167,8 +182,16 @@ public:
                     node = parseAssignment();
                     nodes.push_back(node);
                     break;
+                case Lexer::ID_identifier:
+                    node = parseIdentifier();
+                    nodes.push_back(node);
+                    break;
+                case Lexer::ID_print:
+                    node = parsePrint();
+                    nodes.push_back(node);
+                    break;
                 default:
-                    Utils::error("Unexpected identifier", tokens[token_id]);
+                    Utils::error("[Parse loop] Unexpected identifier, ", tokens[token_id-1]);
                     break;
             }
         }
@@ -180,6 +203,55 @@ public:
 
     }
 
+    ASTNode* parseIdentifier()
+    {
+        std::string identifier = tokens[token_id].lexeme;
+        
+        if (!table.HasVar(identifier))
+            Utils::error("Unknown identifier", tokens[token_id]);
+        int unique_id = table.GetUniqueId(identifier);
+        token_id++;
+        // a = 5 + a;
+        // expect =
+        if (tokens[token_id] != emplex::Lexer::ID_assignment)
+            Utils::error("Expected = after identifier", tokens[token_id]);
+        token_id++;
+        ASTNode* assignmentNode = new ASTNode(ASSIGNMENT);
+        ASTNode* variableNode = new ASTNode(VARIABLE, unique_id);
+        ASTNode* expressionNode = parseExpression();
+        assignmentNode->SetLeft(variableNode);
+        assignmentNode->SetRight(expressionNode);
+        
+        // expect a semicolon at the end of expression
+        if (tokens[token_id] != emplex::Lexer::ID_semicolon)
+            Utils::error("Expected a semicolon at the end of expression (parsing =)", tokens[token_id]);
+        token_id++;
+        return assignmentNode;
+    }
+
+    ASTNode* parsePrint()
+    {
+        token_id++;
+        // parses expressions ONLY. Not fully implemented.
+        // expect that the next lexeme after print is "("
+        if (tokens[token_id] != emplex::Lexer::ID_open_parenthesis)
+            Utils::error("Expected ( after print keyword", tokens[token_id]);
+
+        ASTNode* expression = parseExpression();
+
+        // expect ) and ; at the end
+        if (tokens[token_id-1] != emplex::Lexer::ID_close_parenthesis)
+            Utils::error("Expected ) at the end of print", tokens[token_id]);
+        ++token_id;
+        if (tokens[token_id-1] != emplex::Lexer::ID_semicolon)
+            Utils::error("Expected ; at the end of print");
+        
+        ASTNode* printNode = new ASTNode(PRINT);
+
+        printNode->SetLeft(expression);
+
+        return printNode;
+    }
     void print_table()
     {
         table.PrintTable();
