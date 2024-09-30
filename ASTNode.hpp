@@ -15,9 +15,9 @@ enum Type
     NUMBER, // Contains a literal number in "value" field
     BINARY_OPERATION, // Contains a binary operation + or - in a "token" field, and expressions in both left and right children
     UNARY_OPERATION, // Contains no useful information in its fields. It will have only a left child, the value of which we must negate 
-    UPDATE, // Updates existing variable
-    STATEMENT_BLOCK,
-    PRINT
+    UPDATE, // Updates a variable that already exists, for example a = 5;
+    STATEMENT_BLOCK, // Block node, not implemented
+    PRINT // Print node. Prints expression in its left child. TO DO: printing strings with {}
   };
 class ASTNode {
 
@@ -30,13 +30,6 @@ private:
   ASTNode* left = nullptr;
   ASTNode* right = nullptr;
 
-
-  void error(std::string message, emplex::Token token)
-    {
-    
-        std::cerr << "Error at line " << token.line_id << ": " << message << ", lexeme: " << token.lexeme << "(id " << token.id << ")" << std::endl;
-        exit(1);
-    }
 public:
   ASTNode(Type type)
   {
@@ -108,7 +101,7 @@ public:
         //std::cout << "Unary token id is " << token.id << "\n";
         if (token.id == emplex::Lexer::ID_negation)
           return -value;
-        error("Expected unary -", token);
+        Utils::error("Expected unary -", token);
         return 0;
         break;
       case BINARY_OPERATION:
@@ -129,16 +122,13 @@ public:
         std::cout << lvalue << std::endl;
         break;
       default:
-        error("Unknown token",token);
+        Utils::error("Unknown token encountered during execution of a tree",token);
+        break;
       
         
     }
 
     return 0;
-  }
-  emplex::Token getToken()
-  {
-    return this->token;
   }
 
   int getVarId()

@@ -19,9 +19,10 @@ private:
         return token.id == emplex::Lexer::ID_add || token.id == emplex::Lexer::ID_negation;
     }
 
+    // parses a statement that begins with var - either just initialization or assignment
+    // i.e. var x; OR var x = expression;
     ASTNode* parseAssignment()
     {
-        // var x; OR var x = expression;
         using namespace emplex;
         ++token_id;
         ASTNode* node = new ASTNode(Type::ASSIGNMENT); // assignment node
@@ -70,6 +71,7 @@ private:
         return node;
     }
 
+
     ASTNode* parseExpression()
     {
         ASTNode* node = parseTerm(); 
@@ -116,9 +118,6 @@ private:
         if (token_id < tokens.size() && tokens[token_id] == Lexer::ID_identifier)
         {
             // create a "VARIABLE" node and initialize "token" field with information about the variable
-            if (!table.HasVar(tokens[token_id].lexeme))
-                Utils::error("Variable not defined", tokens[token_id]);
-            
             int unique_id = table.GetUniqueId(tokens[token_id].lexeme);
             ++token_id;
             return new ASTNode(VARIABLE, unique_id);
@@ -204,21 +203,25 @@ public:
     }
 
     ASTNode* parseIdentifier()
+    // parses statement that begins with an identifier (variable name)
     {
-        std::string identifier = tokens[token_id].lexeme;
+        std::string identifier = tokens[token_id].lexeme; //extract variable name
         
-        if (!table.HasVar(identifier))
-            Utils::error("Unknown identifier", tokens[token_id]);
-        int unique_id = table.GetUniqueId(identifier);
-        token_id++;
-        // a = 5 + a;
-        // expect =
-        if (tokens[token_id] != emplex::Lexer::ID_assignment)
+
+        int unique_id = table.GetUniqueId(identifier); // get a unique id of this variable in a SymbolTable
+        
+        
+
+        // expect "=" after an identifier
+        if (tokens[++token_id] != emplex::Lexer::ID_assignment)
             Utils::error("Expected = after identifier", tokens[token_id]);
+
         token_id++;
-        ASTNode* assignmentNode = new ASTNode(ASSIGNMENT);
-        ASTNode* variableNode = new ASTNode(VARIABLE, unique_id);
-        ASTNode* expressionNode = parseExpression();
+
+        ASTNode* assignmentNode = new ASTNode(ASSIGNMENT); // create an assignment node
+        ASTNode* variableNode = new ASTNode(VARIABLE, unique_id); // create a variable node (left child)
+        ASTNode* expressionNode = parseExpression(); // create an expression node (right child)
+
         assignmentNode->SetLeft(variableNode);
         assignmentNode->SetRight(expressionNode);
         
@@ -230,13 +233,15 @@ public:
     }
 
     ASTNode* parsePrint()
+    // parses expressions ONLY. Not fully implemented.
     {
         token_id++;
-        // parses expressions ONLY. Not fully implemented.
+        
         // expect that the next lexeme after print is "("
         if (tokens[token_id] != emplex::Lexer::ID_open_parenthesis)
             Utils::error("Expected ( after print keyword", tokens[token_id]);
 
+        // parse whatever expression there is
         ASTNode* expression = parseExpression();
 
         // expect ) and ; at the end
