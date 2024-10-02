@@ -103,7 +103,7 @@ namespace emplex {
       /* State 74 */ {-1,-1,-1,74,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1}
     }};
     // DFA stop states (0 indicates NOT a stop)
-    static constexpr std::array<int, NUM_STATES> stop_id = {0,0,255,243,239,0,225,224,241,238,244,0,240,253,228,235,231,233,245,0,245,245,245,245,245,227,0,226,229,245,245,245,245,248,248,245,251,251,245,245,245,247,247,250,250,245,245,249,249,246,233,234,231,232,235,236,253,252,252,240,254,254,252,241,242,225,0,0,0,0,0,230,243,237,255};
+    static constexpr std::array<int, NUM_STATES> stop_id = {0,0,255,242,238,0,225,224,240,237,244,0,239,253,228,235,231,233,245,0,245,245,245,245,245,227,0,226,229,245,245,245,245,248,248,245,251,251,245,245,245,247,247,250,250,245,245,249,249,246,233,234,231,232,235,236,253,252,252,239,254,254,252,240,241,225,0,0,0,0,0,230,242,243,255};
   
   public:
     constexpr static int SYMBOL_START = 2;     ///< Symbol to indicate a start of line.
@@ -161,13 +161,13 @@ namespace emplex {
     static constexpr int ID_greater_or_eq = 234;    // Regex: >=
     static constexpr int ID_less_than = 235;        // Regex: <
     static constexpr int ID_less_or_eq = 236;       // Regex: <=
-    static constexpr int ID_not_eq = 237;           // Regex: !=
-    static constexpr int ID_add = 238;              // Regex: \+
-    static constexpr int ID_modulus = 239;          // Regex: %
-    static constexpr int ID_divide = 240;           // Regex: /
-    static constexpr int ID_multiply = 241;         // Regex: \*
-    static constexpr int ID_exponent = 242;         // Regex: \*\*
-    static constexpr int ID_not = 243;              // Regex: !
+    static constexpr int ID_add = 237;              // Regex: \+
+    static constexpr int ID_modulus = 238;          // Regex: %
+    static constexpr int ID_divide = 239;           // Regex: /
+    static constexpr int ID_multiply = 240;         // Regex: \*
+    static constexpr int ID_exponent = 241;         // Regex: \*\*
+    static constexpr int ID_not = 242;              // Regex: !
+    static constexpr int ID_not_eq = 243;           // Regex: !=
     static constexpr int ID_negation = 244;         // Regex: -
     static constexpr int ID_identifier = 245;       // Regex: [a-zA-Z_][a-zA-Z0-9_]*
     static constexpr int ID_string = 246;           // Regex: "(?:[^"\\]|\\.)*"
@@ -199,13 +199,13 @@ namespace emplex {
       case 234: return "greater_or_eq";
       case 235: return "less_than";
       case 236: return "less_or_eq";
-      case 237: return "not_eq";
-      case 238: return "add";
-      case 239: return "modulus";
-      case 240: return "divide";
-      case 241: return "multiply";
-      case 242: return "exponent";
-      case 243: return "not";
+      case 237: return "add";
+      case 238: return "modulus";
+      case 239: return "divide";
+      case 240: return "multiply";
+      case 241: return "exponent";
+      case 242: return "not";
+      case 243: return "not_eq";
       case 244: return "negation";
       case 245: return "identifier";
       case 246: return "string";
