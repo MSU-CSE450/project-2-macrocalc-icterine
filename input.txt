@@ -1,0 +1,7 @@
+var a = 10;
+var b = -a;
+print(a);
+print(b);
+print (!a);
+print(!0);
+print(!1);

@@ -30,3 +30,12 @@
 *.exe
 *.out
 *.app
+
+# VSCode util files
+.vscode/
+
+# Current tests
+/tests/current/
+
+#Project2 file
+Project2
