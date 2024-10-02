@@ -94,13 +94,15 @@ public:
         }
         //std::cout << "Running node ASSIGNMENT: var " << var_identifier << " = " << rvalue << std::endl;
         symbols.UpdateVar(unique_id, rvalue);
-        break;
+        return rvalue;
       case UNARY_OPERATION:
         // UNARY node will has only one left child - value it has to negate
         value = left->Run(symbols);
         //std::cout << "Unary token id is " << token.id << "\n";
         if (token.id == emplex::Lexer::ID_negation)
           return -value;
+        else if (token.id == emplex::Lexer::ID_not)
+          return value == 0 ? 1 : 0;  // Logical NOT
         Utils::error("Expected unary -", token);
         return 0;
         break;
@@ -116,6 +118,15 @@ public:
           case emplex::Lexer::ID_negation:
             value = lvalue - rvalue;
             return lvalue - rvalue;
+          case emplex::Lexer::ID_multiply:
+            return lvalue * rvalue;
+          case emplex::Lexer::ID_divide:
+            if (rvalue == 0) Utils::error("Division by zero", token);
+              return lvalue / rvalue;
+          case emplex::Lexer::ID_exponent:
+            return pow(lvalue, rvalue);
+          default:
+            Utils::error("Unknown binary operation", token);
         }
       case PRINT:
         lvalue = left->Run(symbols);

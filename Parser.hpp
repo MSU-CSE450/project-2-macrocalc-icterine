@@ -74,6 +74,7 @@ private:
 
     ASTNode* parseExpression()
     {
+        using namespace emplex;
         ASTNode* node = parseTerm(); 
         while (token_id < tokens.size() && isPlusOrMinusToken(tokens[token_id]))
         {
@@ -89,61 +90,114 @@ private:
         return node;
     }
 
-    ASTNode* parseTerm()
+ASTNode* parseTerm()
+{
+    using namespace emplex;
+    ASTNode* node = parseFactor(); 
+    while (token_id < tokens.size() && (tokens[token_id].id == emplex::Lexer::ID_multiply || tokens[token_id].id == emplex::Lexer::ID_divide))
     {
-        using namespace emplex;
-
-        // handle negation aka unary minus. For example var a = -1;
-        if (token_id < tokens.size() && tokens[token_id] == Lexer::ID_negation)
-        {
-            Token negation_token = tokens[token_id];
-            token_id++;
-            if (token_id >= tokens.size()) Utils::error("Expected a token, got end of the file", tokens[token_id-1]);
-
-            ASTNode* operand = parseTerm(); // parse a term that we have to negate
-            ASTNode* unary_node = new ASTNode(UNARY_OPERATION, negation_token);
-            unary_node->SetLeft(operand); // put this term in the left child of the unary node
-            return unary_node;
-        }
-
-        // numbers
-        if (token_id < tokens.size() && ((tokens[token_id] == Lexer::ID_integer) || (tokens[token_id] == Lexer::ID_float)))
-        {
-            ++token_id;
-            // create a "NUMBER" node and initialize field "value" with a literal number
-            return new ASTNode(NUMBER, std::stod(tokens[token_id-1].lexeme));
-        }
-
-        //variables
-        if (token_id < tokens.size() && tokens[token_id] == Lexer::ID_identifier)
-        {
-            // create a "VARIABLE" node and initialize "token" field with information about the variable
-            int unique_id = table.GetUniqueId(tokens[token_id].lexeme);
-            ++token_id;
-            return new ASTNode(VARIABLE, unique_id);
-        }
-
-
-        // parentheses
-        if (token_id < tokens.size() && tokens[token_id] == Lexer::ID_open_parenthesis)
-        {
-            token_id++; // skip the "(" and parse expression as usual
-            ASTNode* node = parseExpression();
-
-            // expect to have the ")" parenthesis at the end of expression
-            if (token_id < tokens.size() && tokens[token_id] != Lexer::ID_close_parenthesis)
-            {
-                Utils::error("Expected ) at the end of expression", tokens[token_id]);
-            }
-            token_id++;
-            return node;
-        }
-
-        // anything that is not implemented yet
-        Utils::error("Unexpected token in the term", tokens[token_id]);
-
-        return nullptr;
+        emplex::Token binary_op = tokens[token_id];
+        ++token_id;
+        ASTNode* right_node = parseFactor();
+        ASTNode* binary_op_node = new ASTNode(BINARY_OPERATION, binary_op);
+        binary_op_node->SetLeft(node);
+        binary_op_node->SetRight(right_node);
+        node = binary_op_node;
     }
+    return node;
+}
+
+ASTNode* parseFactor()
+{
+    using namespace emplex;
+    ASTNode* node = parsePrimary();
+    if (token_id < tokens.size() && tokens[token_id].id == emplex::Lexer::ID_exponent)
+    {
+        emplex::Token binary_op = tokens[token_id];
+        ++token_id;
+        ASTNode* right_node = parseFactor();  // Right-associative behavior: parse the right side recursively
+        ASTNode* binary_op_node = new ASTNode(BINARY_OPERATION, binary_op);
+        binary_op_node->SetLeft(node);
+        binary_op_node->SetRight(right_node);
+        node = binary_op_node;
+    }
+    return node;
+}
+
+// parsePrimary handles numbers, variables, and parenthesized expressions
+ASTNode* parsePrimary()
+{
+    // Handle negation (unary minus)
+    if (token_id < tokens.size() && tokens[token_id].id == emplex::Lexer::ID_negation)
+    {
+        emplex::Token negation_token = tokens[token_id];
+        ++token_id;
+        ASTNode* operand = parsePrimary();  // Recursively parse the operand
+        ASTNode* negation_node = new ASTNode(UNARY_OPERATION, negation_token);
+        negation_node->SetLeft(operand);
+        return negation_node;
+    }
+
+        // Handle logical NOT (!)
+    if (token_id < tokens.size() && tokens[token_id].id == emplex::Lexer::ID_not)
+    {
+        emplex::Token not_token = tokens[token_id];
+        ++token_id;
+        ASTNode* operand = parsePrimary();  // Recursively parse the operand
+        ASTNode* not_node = new ASTNode(UNARY_OPERATION, not_token);
+        not_node->SetLeft(operand);
+        return not_node;
+    }
+
+        // Handle assignment in expressions
+    if (token_id < tokens.size() && tokens[token_id].id == emplex::Lexer::ID_identifier)
+    {
+        int unique_id = table.GetUniqueId(tokens[token_id].lexeme);
+        ++token_id;
+
+        // Handle assignment inside expressions
+        if (token_id < tokens.size() && tokens[token_id].id == emplex::Lexer::ID_assignment)
+        {
+            ++token_id;
+            ASTNode* assignment_expr = parseExpression(); // Right-hand side of the assignment
+            ASTNode* assignment_node = new ASTNode(ASSIGNMENT);
+            assignment_node->SetLeft(new ASTNode(VARIABLE, unique_id));
+            assignment_node->SetRight(assignment_expr);
+            return assignment_node;  // Return the assignment node as part of the expression
+        }
+
+        return new ASTNode(VARIABLE, unique_id);
+    }
+
+    // Handle floating-point numbers and integers
+    if (token_id < tokens.size() && (tokens[token_id].id == emplex::Lexer::ID_integer || tokens[token_id].id == emplex::Lexer::ID_float))
+    {
+        ++token_id;
+        return new ASTNode(NUMBER, std::stod(tokens[token_id-1].lexeme)); // Convert the lexeme to double
+    }
+    else if (token_id < tokens.size() && tokens[token_id].id == emplex::Lexer::ID_identifier)
+    {
+        int unique_id = table.GetUniqueId(tokens[token_id].lexeme);
+        ++token_id;
+        return new ASTNode(VARIABLE, unique_id);
+    }
+    else if (token_id < tokens.size() && tokens[token_id].id == emplex::Lexer::ID_open_parenthesis)
+    {
+        ++token_id;
+        ASTNode* node = parseExpression();
+        if (tokens[token_id].id != emplex::Lexer::ID_close_parenthesis)
+        {
+            Utils::error("Expected closing parenthesis", tokens[token_id]);
+        }
+        ++token_id;
+        return node;
+    }
+
+    Utils::error("Unexpected token", tokens[token_id]);
+    return nullptr;
+}
+
+
 public:
     Parser(std::ifstream& in_file)
     {
@@ -235,21 +289,24 @@ public:
     ASTNode* parsePrint()
     // parses expressions ONLY. Not fully implemented.
     {
-        token_id++;
+        ++token_id;
         
         // expect that the next lexeme after print is "("
         if (tokens[token_id] != emplex::Lexer::ID_open_parenthesis)
             Utils::error("Expected ( after print keyword", tokens[token_id]);
 
+        ++token_id;
+
         // parse whatever expression there is
         ASTNode* expression = parseExpression();
 
         // expect ) and ; at the end
-        if (tokens[token_id-1] != emplex::Lexer::ID_close_parenthesis)
+        if (tokens[token_id] != emplex::Lexer::ID_close_parenthesis)
             Utils::error("Expected ) at the end of print", tokens[token_id]);
         ++token_id;
-        if (tokens[token_id-1] != emplex::Lexer::ID_semicolon)
+        if (tokens[token_id] != emplex::Lexer::ID_semicolon)
             Utils::error("Expected ; at the end of print");
+        ++token_id;
         
         ASTNode* printNode = new ASTNode(PRINT);
 
