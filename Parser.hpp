@@ -72,23 +72,64 @@ private:
     }
 
 
-    ASTNode* parseExpression()
+ASTNode* parseLogical()
+{
+    ASTNode* node = parseComparison(); // First, handle comparison operations
+    while (token_id < tokens.size() &&
+          (tokens[token_id].id == emplex::Lexer::ID_and ||
+           tokens[token_id].id == emplex::Lexer::ID_or))
     {
-        using namespace emplex;
-        ASTNode* node = parseTerm(); 
-        while (token_id < tokens.size() && isPlusOrMinusToken(tokens[token_id]))
-        {
-            emplex::Token binary_op = tokens[token_id];
-            ++token_id;
-            ASTNode* right_node = parseTerm();
-            ASTNode* binary_op_node = new ASTNode(BINARY_OPERATION, binary_op);
-            binary_op_node->SetLeft(node);
-            binary_op_node->SetRight(right_node); 
-
-            node = binary_op_node;
-        }
-        return node;
+        emplex::Token logical_op = tokens[token_id];
+        ++token_id;
+        ASTNode* right_node = parseComparison(); // Parse the right-hand side after comparison
+        ASTNode* logical_op_node = new ASTNode(BINARY_OPERATION, logical_op);
+        logical_op_node->SetLeft(node);
+        logical_op_node->SetRight(right_node);
+        node = logical_op_node;
     }
+    return node;
+}
+
+
+ASTNode* parseComparison()
+{
+    ASTNode* node = parseExpression(); // First parse the arithmetic expression
+    while (token_id < tokens.size() &&
+          (tokens[token_id].id == emplex::Lexer::ID_equality ||
+           tokens[token_id].id == emplex::Lexer::ID_not_eq ||
+           tokens[token_id].id == emplex::Lexer::ID_greater_than ||
+           tokens[token_id].id == emplex::Lexer::ID_greater_or_eq ||
+           tokens[token_id].id == emplex::Lexer::ID_less_than ||
+           tokens[token_id].id == emplex::Lexer::ID_less_or_eq))
+    {
+        emplex::Token binary_op = tokens[token_id];
+        ++token_id;
+        ASTNode* right_node = parseExpression(); // Parse the right-hand side as another arithmetic expression
+        ASTNode* binary_op_node = new ASTNode(BINARY_OPERATION, binary_op);
+        binary_op_node->SetLeft(node);
+        binary_op_node->SetRight(right_node);
+        node = binary_op_node;
+    }
+    return node;
+}
+
+ASTNode* parseExpression()
+{
+    ASTNode* node = parseTerm();
+    while (token_id < tokens.size() &&
+          (tokens[token_id].id == emplex::Lexer::ID_add ||
+           tokens[token_id].id == emplex::Lexer::ID_negation))
+    {
+        emplex::Token binary_op = tokens[token_id];
+        ++token_id;
+        ASTNode* right_node = parseTerm();
+        ASTNode* binary_op_node = new ASTNode(BINARY_OPERATION, binary_op);
+        binary_op_node->SetLeft(node);
+        binary_op_node->SetRight(right_node);
+        node = binary_op_node;
+    }
+    return node;
+}
 
 ASTNode* parseTerm()
 {
@@ -147,6 +188,14 @@ ASTNode* parsePrimary()
         ASTNode* not_node = new ASTNode(UNARY_OPERATION, not_token);
         not_node->SetLeft(operand);
         return not_node;
+    }
+
+     // Handle string literals
+    if (token_id < tokens.size() && tokens[token_id].id == emplex::Lexer::ID_string)
+    {
+        std::string string_value = tokens[token_id].lexeme;
+        ++token_id;
+        return new ASTNode(STRING, string_value);  // Create a STRING node
     }
 
         // Handle assignment in expressions
@@ -296,20 +345,27 @@ public:
             Utils::error("Expected ( after print keyword", tokens[token_id]);
 
         ++token_id;
+        // Check if the next token is a string literal
+        ASTNode* expression;
+        if (tokens[token_id].id == emplex::Lexer::ID_string)
+        {
+            expression = new ASTNode(STRING, tokens[token_id].lexeme);  // Handle the string literal
+            ++token_id;  // Move past the string token
+        }
+        else
+        {
+            expression = parseLogical();  // Handle other expressions
+        }
 
-        // parse whatever expression there is
-        ASTNode* expression = parseExpression();
-
-        // expect ) and ; at the end
-        if (tokens[token_id] != emplex::Lexer::ID_close_parenthesis)
-            Utils::error("Expected ) at the end of print", tokens[token_id]);
-        ++token_id;
-        if (tokens[token_id] != emplex::Lexer::ID_semicolon)
-            Utils::error("Expected ; at the end of print");
-        ++token_id;
+        if (tokens[token_id].id != emplex::Lexer::ID_close_parenthesis)
+            Utils::error("Expected closing parenthesis at the end of print expression", tokens[token_id]);
+        ++token_id; // Skip ')'
+        
+        if (tokens[token_id].id != emplex::Lexer::ID_semicolon)
+            Utils::error("Expected ; at the end of print statement", tokens[token_id]);
+        ++token_id; // Skip ';'
         
         ASTNode* printNode = new ASTNode(PRINT);
-
         printNode->SetLeft(expression);
 
         return printNode;

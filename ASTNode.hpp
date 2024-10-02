@@ -17,7 +17,8 @@ enum Type
     UNARY_OPERATION, // Contains no useful information in its fields. It will have only a left child, the value of which we must negate 
     UPDATE, // Updates a variable that already exists, for example a = 5;
     STATEMENT_BLOCK, // Block node, not implemented
-    PRINT // Print node. Prints expression in its left child. TO DO: printing strings with {}
+    PRINT, // Print node. Prints expression in its left child. TO DO: printing strings with {}
+    STRING // Contains a string field
   };
 class ASTNode {
 
@@ -27,10 +28,15 @@ private:
   emplex::Token token;
   int var_unique_id;
   double value = 0;
+  std::string string_value = "";
   ASTNode* left = nullptr;
   ASTNode* right = nullptr;
 
 public:
+
+// Constructor for STRING nodes
+ASTNode(Type type, const std::string& string_val) : type(type), string_value(string_val) {}
+
   ASTNode(Type type)
   {
     this->type = type;
@@ -82,10 +88,11 @@ public:
       case NUMBER:
         //std::cout << "RUN NUMBER, value = " << value << std::endl;
         return value;
-        break;
+      case STRING:
+        std::cout << string_value << std::endl; // implement string printing
+        return 0;
       case VARIABLE:
         return symbols.GetValue(var_unique_id);
-        break;
       case ASSIGNMENT:
         unique_id = left->getVarId();
         if (right != nullptr)
@@ -105,18 +112,21 @@ public:
           return value == 0 ? 1 : 0;  // Logical NOT
         Utils::error("Expected unary -", token);
         return 0;
-        break;
       case BINARY_OPERATION:
         lvalue = left->Run(symbols);
-        rvalue = right->Run(symbols);
+
+        // Short-circuit for AND (&&) and OR (||)
+        if (token.id == emplex::Lexer::ID_and)
+          return (lvalue != 0) && (right->Run(symbols) != 0) ? 1 : 0;  // Logical AND
+        if (token.id == emplex::Lexer::ID_or)
+          return (lvalue != 0) || (right->Run(symbols) != 0) ? 1 : 0;  // Logical OR
         //std::cout << "Executing BINARY_OPERATION: left = " << lvalue << ", right = " << rvalue << std::endl;
+        rvalue = right->Run(symbols);
         switch (token.id)
         {
           case emplex::Lexer::ID_add:
-            value = lvalue + rvalue;
             return lvalue + rvalue;
           case emplex::Lexer::ID_negation:
-            value = lvalue - rvalue;
             return lvalue - rvalue;
           case emplex::Lexer::ID_multiply:
             return lvalue * rvalue;
@@ -125,6 +135,18 @@ public:
               return lvalue / rvalue;
           case emplex::Lexer::ID_exponent:
             return pow(lvalue, rvalue);
+          case emplex::Lexer::ID_equality:
+            return lvalue == rvalue ? 1 : 0;  // Equality (==)
+          case emplex::Lexer::ID_not_eq:
+            return lvalue != rvalue ? 1 : 0;  // Not equal (!=)
+          case emplex::Lexer::ID_greater_than:
+            return lvalue > rvalue ? 1 : 0;   // Greater than (>)
+          case emplex::Lexer::ID_greater_or_eq:
+            return lvalue >= rvalue ? 1 : 0;  // Greater than or equal (>=)
+          case emplex::Lexer::ID_less_than:
+            return lvalue < rvalue ? 1 : 0;   // Less than (<)
+          case emplex::Lexer::ID_less_or_eq:
+            return lvalue <= rvalue ? 1 : 0;  // Less than or equal (<=)
           default:
             Utils::error("Unknown binary operation", token);
         }
