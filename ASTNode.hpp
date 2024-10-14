@@ -8,122 +8,126 @@
 #include "SymbolTable.hpp"
 #include "lexer.hpp"
 #include "Utils.hpp"
-enum Type
-  {
-    ASSIGNMENT, // Contains a variable in the left child and expression in the right child
-    VARIABLE, // Contains information about the name of a variable in "token" field
-    NUMBER, // Contains a literal number in "value" field
-    BINARY_OPERATION, // Contains a binary operation + or - in a "token" field, and expressions in both left and right children
-    UNARY_OPERATION, // Contains no useful information in its fields. It will have only a left child, the value of which we must negate 
-    UPDATE, // Updates a variable that already exists, for example a = 5;
-    STATEMENT_BLOCK, // Block node, not implemented
-    PRINT, // Print node. Prints expression in its left child. TO DO: printing strings with {}
-    STRING // Contains a string field
-  };
-class ASTNode {
 
+enum Type {
+  ASSIGNMENT,        // Variable assignment (left = variable, right = expression)
+  VARIABLE,          // Variable node
+  NUMBER,            // Numeric literal
+  BINARY_OPERATION,  // Binary operations (+, -, *, etc.)
+  UNARY_OPERATION,   // Unary operations (negation, logical NOT)
+  UPDATE,            // Update variable value
+  STATEMENT_BLOCK,   // Block of statements
+  PRINT,             // Print statements
+  STRING,            // String literals
+  IF_STATEMENT       // If statements (not yet implemented)
+};
+
+class ASTNode {
 private:
-  
   Type type;
   emplex::Token token;
   int var_unique_id;
   double value = 0;
-  std::string string_value = "";
+  std::string lexeme;
   ASTNode* left = nullptr;
   ASTNode* right = nullptr;
+  ASTNode* condition = nullptr;  // For 'if' statements
+  ASTNode* ifBlock = nullptr;    // Block to execute if condition is true
+  std::vector<ASTNode*> blockStatements;
+
+  // Helper function to process strings with variable interpolation
+  std::string processString(const std::string& str, SymbolTable& symbols) {
+    std::ostringstream result;
+    size_t i = 0;
+    
+    while (i < str.length()) {
+      if (str[i] == '{') {
+        size_t j = i + 1;
+        while (j < str.length() && str[j] != '}') ++j;
+        if (j < str.length() && str[j] == '}') {
+          std::string var_name = str.substr(i + 1, j - i - 1);
+          int unique_id = symbols.GetUniqueId(var_name);
+          double var_value = symbols.GetValue(unique_id);
+
+          result << (var_value == static_cast<int>(var_value) ? static_cast<int>(var_value) : var_value);
+          i = j + 1;
+        }
+      } else {
+        result << str[i];
+        ++i;
+      }
+    }
+    
+    return result.str();
+  }
 
 public:
+  // Constructor for STRING nodes
+  ASTNode(Type type, const std::string& string_val) : type(type), lexeme(string_val) {}
 
-// Constructor for STRING nodes
-ASTNode(Type type, const std::string& string_val) : type(type), string_value(string_val) {}
+  // Constructor for other types
+  ASTNode(Type type) : type(type) {}
 
-  ASTNode(Type type)
-  {
-    this->type = type;
-  }
-  ASTNode(Type type, emplex::Token token) : ASTNode(type)
-  {
-    this->token = token;
-  }
-  ASTNode(Type type, double value) : ASTNode(type)
-  {
-    if (type == Type::VARIABLE)
-      var_unique_id = (int) value;
-    else
-      this->value = value;
-    //std::cout << "Created NUMBER with a value " << value << std::endl;
-    
-  }
-  ASTNode(Type type, ASTNode* left) : ASTNode(type)
-  {
-    this->left = left;
+  // Constructor with token
+  ASTNode(Type type, emplex::Token token) : ASTNode(type) { this->token = token; }
+
+  // Constructor for NUMBER or VARIABLE nodes
+  ASTNode(Type type, double value) : ASTNode(type) {
+    if (type == Type::VARIABLE) var_unique_id = static_cast<int>(value);
+    else this->value = value;
   }
 
-  ASTNode(Type type, VarData varData) : ASTNode(type)
-  {
-    var_unique_id = varData.unique_id;
-  }
-  // CONSTRUCTORS, ETC HERE.
-  // CAN SPECIFY NODE TYPE AND ANY NEEDED VALUES HERE OR USING OTHER FUNCTIONS.
+  // Set block statements for a block node
+  void SetBlockStatements(std::vector<ASTNode*> blockStatements) { this->blockStatements = blockStatements; }
 
-  // CODE TO ADD CHILDREN AND SETUP AST NODE HERE.
-  void AddChild(ASTNode node) { ; }
-  void SetLeft(ASTNode* node)
-  {
-    left = node;
-  }
-  void SetRight(ASTNode* node)
-  {
-    right = node;
-  }
-  
-  // CODE TO EXECUTE THIS NODE (AND ITS CHILDREN, AS NEEDED).
-  double Run(SymbolTable & symbols) 
-  { 
+  // Set left and right child nodes
+  void SetLeft(ASTNode* node) { left = node; }
+  void SetRight(ASTNode* node) { right = node; }
+
+  // Main run function to evaluate the ASTNode
+  double Run(SymbolTable& symbols) { 
     double lvalue = 0, rvalue = 0;
     int unique_id;
-    std::string var_identifier{};
-    switch (type)
-    {
+
+    switch (type) {
       case NUMBER:
-        //std::cout << "RUN NUMBER, value = " << value << std::endl;
         return value;
-      case STRING:
-        std::cout << string_value << std::endl; // implement string printing
+
+      case STRING: {
+        std::string stripped_string = lexeme.substr(1, lexeme.length() - 2);
+        std::cout << processString(stripped_string, symbols) << std::endl;
         return 0;
+      }
+
       case VARIABLE:
         return symbols.GetValue(var_unique_id);
+
       case ASSIGNMENT:
-        unique_id = left->getVarId();
-        if (right != nullptr)
-        {
+        unique_id = left->var_unique_id;
+        if (right != nullptr) {
           rvalue = right->Run(symbols);
         }
-        //std::cout << "Running node ASSIGNMENT: var " << var_identifier << " = " << rvalue << std::endl;
         symbols.UpdateVar(unique_id, rvalue);
         return rvalue;
+
       case UNARY_OPERATION:
-        // UNARY node will has only one left child - value it has to negate
         value = left->Run(symbols);
-        //std::cout << "Unary token id is " << token.id << "\n";
         if (token.id == emplex::Lexer::ID_negation)
           return -value;
         else if (token.id == emplex::Lexer::ID_not)
-          return value == 0 ? 1 : 0;  // Logical NOT
-        Utils::error("Expected unary -", token);
+          return value == 0 ? 1 : 0;
+        Utils::error("Expected unary operation", token);
         return 0;
+
       case BINARY_OPERATION:
         lvalue = left->Run(symbols);
-
-        // Short-circuit for AND (&&) and OR (||)
         if (token.id == emplex::Lexer::ID_and)
-          return (lvalue != 0) && (right->Run(symbols) != 0) ? 1 : 0;  // Logical AND
+          return (lvalue != 0) && (right->Run(symbols) != 0) ? 1 : 0;
         if (token.id == emplex::Lexer::ID_or)
-          return (lvalue != 0) || (right->Run(symbols) != 0) ? 1 : 0;  // Logical OR
-        //std::cout << "Executing BINARY_OPERATION: left = " << lvalue << ", right = " << rvalue << std::endl;
+          return (lvalue != 0) || (right->Run(symbols) != 0) ? 1 : 0;
+
         rvalue = right->Run(symbols);
-        switch (token.id)
-        {
+        switch (token.id) {
           case emplex::Lexer::ID_add:
             return lvalue + rvalue;
           case emplex::Lexer::ID_negation:
@@ -132,44 +136,42 @@ ASTNode(Type type, const std::string& string_val) : type(type), string_value(str
             return lvalue * rvalue;
           case emplex::Lexer::ID_divide:
             if (rvalue == 0) Utils::error("Division by zero", token);
-              return lvalue / rvalue;
+            return lvalue / rvalue;
           case emplex::Lexer::ID_exponent:
             return pow(lvalue, rvalue);
           case emplex::Lexer::ID_equality:
-            return lvalue == rvalue ? 1 : 0;  // Equality (==)
+            return lvalue == rvalue ? 1 : 0;
           case emplex::Lexer::ID_not_eq:
-            return lvalue != rvalue ? 1 : 0;  // Not equal (!=)
+            return lvalue != rvalue ? 1 : 0;
           case emplex::Lexer::ID_greater_than:
-            return lvalue > rvalue ? 1 : 0;   // Greater than (>)
+            return lvalue > rvalue ? 1 : 0;
           case emplex::Lexer::ID_greater_or_eq:
-            return lvalue >= rvalue ? 1 : 0;  // Greater than or equal (>=)
+            return lvalue >= rvalue ? 1 : 0;
           case emplex::Lexer::ID_less_than:
-            return lvalue < rvalue ? 1 : 0;   // Less than (<)
+            return lvalue < rvalue ? 1 : 0;
           case emplex::Lexer::ID_less_or_eq:
-            return lvalue <= rvalue ? 1 : 0;  // Less than or equal (<=)
+            return lvalue <= rvalue ? 1 : 0;
           default:
             Utils::error("Unknown binary operation", token);
         }
+
       case PRINT:
         lvalue = left->Run(symbols);
-        std::cout << lvalue << std::endl;
-        break;
+        if (left->type != STRING) {
+          std::cout << lvalue << std::endl;
+        }
+        return 0;
+
+      case STATEMENT_BLOCK:
+        for (ASTNode* statement : blockStatements) {
+          statement->Run(symbols);
+        }
+        return 0;
+
       default:
-        Utils::error("Unknown token encountered during execution of a tree",token);
-        break;
-      
-        
+        Utils::error("Unknown node type encountered during execution", token);
     }
 
     return 0;
-  }
-
-  int getVarId()
-  {
-    return this->var_unique_id;
-  }
-  ASTNode* getRight()
-  {
-    return this->right;
   }
 };
