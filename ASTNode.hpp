@@ -19,7 +19,8 @@ enum Type {
   STATEMENT_BLOCK,   // Block of statements
   PRINT,             // Print statements
   STRING,            // String literals
-  IF_STATEMENT       // If statements (not yet implemented)
+  IF_STATEMENT,      // If statements
+  ELSE_STATEMENT     // Else statements
 };
 
 class ASTNode {
@@ -31,8 +32,7 @@ private:
   std::string lexeme;
   ASTNode* left = nullptr;
   ASTNode* right = nullptr;
-  ASTNode* condition = nullptr;  // For 'if' statements
-  ASTNode* ifBlock = nullptr;    // Block to execute if condition is true
+  ASTNode* elseBlock = nullptr; // optional 3rd child for 'if' nodes
   std::vector<ASTNode*> blockStatements;
 
   // Helper function to process strings with variable interpolation
@@ -83,6 +83,7 @@ public:
   // Set left and right child nodes
   void SetLeft(ASTNode* node) { left = node; }
   void SetRight(ASTNode* node) { right = node; }
+  void SetElseBlock(ASTNode* node) { elseBlock = node; }
 
   // Main run function to evaluate the ASTNode
   double Run(SymbolTable& symbols) { 
@@ -137,6 +138,13 @@ public:
           case emplex::Lexer::ID_divide:
             if (rvalue == 0) Utils::error("Division by zero", token);
             return lvalue / rvalue;
+          case emplex::Lexer::ID_modulus:
+          {
+            int lvalue_int = round(lvalue);
+            int rvalue_int = round(rvalue);
+            auto result = lvalue_int % rvalue_int;
+            return (double)result;
+          }
           case emplex::Lexer::ID_exponent:
             return pow(lvalue, rvalue);
           case emplex::Lexer::ID_equality:
@@ -166,6 +174,21 @@ public:
         for (ASTNode* statement : blockStatements) {
           statement->Run(symbols);
         }
+        return 0;
+
+      case IF_STATEMENT:
+        lvalue = left->Run(symbols);
+        if (lvalue != 0) {
+          rvalue = right->Run(symbols);
+        }
+        else if (elseBlock != nullptr)
+        {
+          elseBlock->Run(symbols);
+        }
+        return 0;
+
+      case ELSE_STATEMENT:
+        rvalue = right->Run(symbols);
         return 0;
 
       default:

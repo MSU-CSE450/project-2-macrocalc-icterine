@@ -79,6 +79,7 @@ private:
 
   // Parses comparison expressions (e.g., a == b, a < b)
   ASTNode* parseComparison() {
+    int binary_node_count = 0;
     ASTNode* node = parseExpression();
     while (token_id < tokens.size() &&
           (tokens[token_id].id == Lexer::ID_equality || 
@@ -90,7 +91,14 @@ private:
       emplex::Token binary_op = tokens[token_id];
       ++token_id;
       ASTNode* right_node = parseExpression();
+      
       ASTNode* binary_op_node = new ASTNode(BINARY_OPERATION, binary_op);
+      binary_node_count++;
+
+      if (binary_node_count > 1) {
+        Utils::error("Comparisons should be non-associative.", tokens[token_id]);
+      }
+
       binary_op_node->SetLeft(node);
       binary_op_node->SetRight(right_node);
       node = binary_op_node;
@@ -115,12 +123,13 @@ private:
     return node;
   }
 
-  // Parses multiplication and division expressions (e.g., a * b / c)
+  // Parses multiplication, division, and modulus expressions (e.g., a * b / c % d)
   ASTNode* parseTerm() {
     ASTNode* node = parseFactor();
     while (token_id < tokens.size() && 
           (tokens[token_id].id == Lexer::ID_multiply || 
-           tokens[token_id].id == Lexer::ID_divide)) {
+           tokens[token_id].id == Lexer::ID_divide ||
+           tokens[token_id].id == Lexer::ID_modulus)) {
       emplex::Token binary_op = tokens[token_id];
       ++token_id;
       ASTNode* right_node = parseFactor();
@@ -237,6 +246,9 @@ private:
         case Lexer::ID_print:
           blockStatements.push_back(parsePrint());
           break;
+        case Lexer::ID_if:
+          blockStatements.push_back(parseIf());
+          break;
         default:
           Utils::error("Unexpected token in block", tokens[token_id]);
           break;
@@ -253,6 +265,76 @@ private:
 
     table.PopScope();
     return blockNode;
+  }
+
+  ASTNode* parseSingleLine() {
+
+    ASTNode* statement;
+    if (token_id < tokens.size() && tokens[token_id].id != Lexer::ID_semicolon) {
+      switch (tokens[token_id].id) {
+        case Lexer::ID_var:
+          statement = parseAssignment();
+          break;
+        case Lexer::ID_identifier:
+          statement = parseIdentifier();
+          break;
+        case Lexer::ID_print:
+          statement = parsePrint();
+          break;
+        default:
+          Utils::error("Unexpected token in block", tokens[token_id]);
+          break;
+      }
+    }
+
+    return statement;
+  }
+
+  ASTNode* parseIf() {
+    if (tokens[token_id + 1].id != Lexer::ID_open_parenthesis) {
+      Utils::error("Expected ( at the start of condition", tokens[token_id]);
+    }
+    auto if_token = tokens[token_id];
+    ASTNode* if_node = new ASTNode(IF_STATEMENT, if_token);
+
+    token_id += 2; // move onto the start of the condition block
+
+    auto conditional = parseComparison();
+    if_node->SetLeft(conditional);
+
+    token_id++; // go to beginning of statement token
+    ASTNode* statement_node;
+
+    if (tokens[token_id].id != Lexer::ID_open_brace) {
+      statement_node = parseSingleLine(); // no block, just single line
+    }
+    else {
+      statement_node = parseBlock(); // typical block parsing
+    }
+
+    if_node->SetRight(statement_node);
+
+    if (tokens[token_id].id == Lexer::ID_else) // possible 'else' condition
+    {
+      auto else_node = parseElse();
+      if_node->SetElseBlock(else_node);
+    }
+
+    return if_node;
+  }
+
+  ASTNode* parseElse() {
+      token_id++;
+      ASTNode* statement_node;
+      
+      if (tokens[token_id].id != Lexer::ID_open_brace) {
+        statement_node = parseSingleLine(); // no block, just single line
+      }
+      else {
+        statement_node = parseBlock(); // typical block parsing
+      }
+
+      return statement_node;
   }
 
 public:
@@ -278,6 +360,9 @@ public:
           break;
         case Lexer::ID_open_brace:
           nodes.push_back(parseBlock());
+          break;
+        case Lexer::ID_if:
+          nodes.push_back(parseIf());
           break;
         default:
           Utils::error("[Parse loop] Unexpected token", tokens[token_id]);
