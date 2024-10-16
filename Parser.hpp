@@ -445,7 +445,11 @@ public:
     Lexer lexer;
     tokens = lexer.Tokenize(in_file);
   }
-
+  void print_tokens()
+  {
+    for (auto token : tokens)
+      std::cout << token.lexeme << " ";
+  }
   // Main parsing function that builds and executes the AST
   void Parse() {
     std::vector<ASTNode*> nodes;
@@ -508,13 +512,21 @@ public:
   // Parses a print statement (e.g., print(expr);)
   ASTNode* parsePrint() {
     ++token_id;
-
     if (tokens[token_id] != Lexer::ID_open_parenthesis) {
       Utils::error("Expected ( after print keyword", tokens[token_id]);
     }
     ++token_id;
 
-    ASTNode* expression = (tokens[token_id].id == Lexer::ID_string) ? new ASTNode(STRING, tokens[token_id++].lexeme) : parseLogical();
+
+    ASTNode* expression;
+    if (tokens[token_id].id == Lexer::ID_string) {
+      std::string str = tokens[token_id++].lexeme;
+      str = str.substr(1, str.length() - 2);
+      auto entries = getVariableEntriesInString(str);
+      expression = new ASTNode(STRING, str, entries);
+    }
+    else 
+      expression = parseLogical();
 
     if (tokens[token_id] != Lexer::ID_close_parenthesis) {
       Utils::error("Expected closing parenthesis at the end of print expression", tokens[token_id]);
@@ -529,5 +541,28 @@ public:
     ASTNode* printNode = new ASTNode(PRINT);
     printNode->SetLeft(expression);
     return printNode;
+  }
+
+  std::vector<std::pair<int, int>> getVariableEntriesInString(std::string& str)
+  {
+    size_t i = 0, index = 0;
+    std::vector<std::pair<int, int>> entries{};
+    while (i < str.length()) {
+      if (str[i] == '{') {
+        size_t j = i + 1;
+        while (j < str.length() && str[j] != '}') ++j;
+        if (j < str.length() && str[j] == '}') {
+          std::string var_name = str.substr(i + 1, j - i - 1); // extract variable name inside {}
+          int unique_id = table.GetUniqueId(var_name); // get unique id
+          entries.push_back(std::make_pair(i, unique_id)); // append index of a variable in a string with its unique id
+          str.erase(i, j - i + 1); // erase {} from a string
+
+        }
+        else if (i >= str.length())
+          Utils::error("Expected } inside the string");
+      }
+      i++;
+    }
+    return entries;
   }
 };

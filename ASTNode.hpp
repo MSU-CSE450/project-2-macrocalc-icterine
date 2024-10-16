@@ -35,36 +35,14 @@ private:
   ASTNode* right = nullptr;
   ASTNode* elseBlock = nullptr; // optional 3rd child for 'if' nodes
   std::vector<ASTNode*> blockStatements;
-
-  // Helper function to process strings with variable interpolation
-  std::string processString(const std::string& str, SymbolTable& symbols) {
-    std::ostringstream result;
-    size_t i = 0;
-    
-    while (i < str.length()) {
-      if (str[i] == '{') {
-        size_t j = i + 1;
-        while (j < str.length() && str[j] != '}') ++j;
-        if (j < str.length() && str[j] == '}') {
-          std::string var_name = str.substr(i + 1, j - i - 1);
-          int unique_id = symbols.GetUniqueId(var_name);
-          double var_value = symbols.GetValue(unique_id);
-
-          result << (var_value == static_cast<int>(var_value) ? static_cast<int>(var_value) : var_value);
-          i = j + 1;
-        }
-      } else {
-        result << str[i];
-        ++i;
-      }
-    }
-    
-    return result.str();
-  }
+  std::vector<std::pair<int, int>> variableEntries; // first pair.first - index in string, pair.second - unique id
 
 public:
   // Constructor for STRING nodes
   ASTNode(Type type, const std::string& string_val) : type(type), lexeme(string_val) {}
+  ASTNode(Type type, const std::string& string_val, std::vector<std::pair<int,int>> entries) : type(type), lexeme(string_val) {
+    this->variableEntries = entries;
+  }
 
   // Constructor for other types
   ASTNode(Type type) : type(type) {}
@@ -96,8 +74,20 @@ public:
         return value;
 
       case STRING: {
-        std::string stripped_string = lexeme.substr(1, lexeme.length() - 2);
-        std::cout << processString(stripped_string, symbols) << std::endl;
+        std::ostringstream result;
+        int var_index = 0, i = 0;
+
+        // move through a string character-by-character
+        while (var_index < variableEntries.size() || i < lexeme.length()) {
+
+          // if current index = index of a variable, look it up in a symbol table and append to the output
+          if (var_index < variableEntries.size() && i == variableEntries[var_index].first) {
+            result << symbols.GetValue(variableEntries[var_index++].second);  
+          } else  {
+            result << lexeme[i++];  
+          }
+        }
+        std::cout << result.str() << "\n";
         return 0;
       }
 
