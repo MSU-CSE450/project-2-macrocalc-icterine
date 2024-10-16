@@ -78,9 +78,18 @@ private:
   }
 
   // Parses comparison expressions (e.g., a == b, a < b)
-  ASTNode* parseComparison() {
+  ASTNode* parseComparison(bool singleLineStatement = false) {
     int binary_node_count = 0;
-    ASTNode* node = parseExpression();
+
+    ASTNode* node;
+    if (singleLineStatement) {
+      token_id++;
+      auto varNode = parseIdentifier(true);
+    }
+    else {
+      node = parseExpression();
+    }
+
     while (token_id < tokens.size() &&
           (tokens[token_id].id == Lexer::ID_equality || 
            tokens[token_id].id == Lexer::ID_not_eq || 
@@ -249,6 +258,9 @@ private:
         case Lexer::ID_if:
           blockStatements.push_back(parseIf());
           break;
+        case Lexer::ID_while:
+          blockStatements.push_back(parseWhile());
+          break;
         default:
           Utils::error("Unexpected token in block", tokens[token_id]);
           break;
@@ -299,7 +311,7 @@ private:
 
     token_id += 2; // move onto the start of the condition block
 
-    auto conditional = parseComparison();
+    auto conditional = parseLogical();
     if_node->SetLeft(conditional);
 
     token_id++; // go to beginning of statement token
@@ -337,6 +349,96 @@ private:
       return statement_node;
   }
 
+  ASTNode* parseSingleLineLoop() {
+
+    ASTNode* statement;
+    if (token_id < tokens.size() && tokens[token_id].id != Lexer::ID_open_parenthesis) {
+      switch (tokens[token_id].id) {
+        case Lexer::ID_var:
+          statement = parseAssignment();
+          break;
+        case Lexer::ID_identifier:
+          statement = parseIdentifier();
+          break;
+        case Lexer::ID_print:
+          statement = parsePrint();
+          break;
+        default:
+          Utils::error("Unexpected token in block", tokens[token_id]);
+          break;
+      }
+    }
+
+    return statement;
+  }
+
+  ASTNode* parseWhile() {
+    if (tokens[token_id + 1].id != Lexer::ID_open_parenthesis) {
+      Utils::error("Expected ( at the start of condition", tokens[token_id]);
+    }
+
+    auto while_token = tokens[token_id];
+    ASTNode* while_node = new ASTNode(WHILE_LOOP, while_token);
+
+    token_id += 2; // move onto the start of the condition block
+
+    ASTNode* conditional;
+    // single line while loop
+    // my idea is to evaluate the assignment first, run it and get its result right here, and then do the comparison
+    // now that I'm writing this down, I don't think it'll work because the comparison operator depends on two nodes to compare with
+    // I would have to change the comparison function to accomodate that
+    // there must be an easier way besides tweaking nearly every single parsing function to consider this one case
+    if (tokens[token_id].id == Lexer::ID_open_parenthesis) {
+      int start = token_id;
+      token_id++;
+      auto varNode = parseIdentifier(true);
+
+    }
+    // normal setup of while loop
+    else {
+      conditional = parseLogical();
+      while_node->SetLeft(conditional); // left child node will be conditional to evaluate every iteration
+
+      token_id++; // go to beginning of statement token
+      ASTNode* statement_node;
+
+      // parse single line or statement block?
+      if (tokens[token_id].id != Lexer::ID_open_brace) {
+        statement_node = parseSingleLine();
+      }
+      else {
+        statement_node = parseBlock();
+      }
+      
+
+      while_node->SetRight(statement_node);
+    }
+    
+    // while_node->SetLeft(conditional); // left child node will be conditional to evaluate every iteration
+
+    // token_id++; // go to beginning of statement token
+    // ASTNode* statement_node;
+
+    // // single-line while-loop
+    // if (tokens[token_id].id == Lexer::ID_open_parenthesis) {
+    //   token_id++;
+    //   statement_node = parseSingleLineLoop();
+    // }
+    // else {
+    //   // parse single line or statement block?
+    //   if (tokens[token_id].id != Lexer::ID_open_brace) {
+    //     statement_node = parseSingleLine();
+    //   }
+    //   else {
+    //     statement_node = parseBlock();
+    //   }
+    // }
+
+    // while_node->SetRight(statement_node);
+
+    return while_node;
+  }
+
 public:
   // Constructor: initialize the parser with tokens from an input file
   Parser(std::ifstream& in_file) {
@@ -364,6 +466,9 @@ public:
         case Lexer::ID_if:
           nodes.push_back(parseIf());
           break;
+        case Lexer::ID_while:
+          nodes.push_back(parseWhile());
+          break;
         default:
           Utils::error("[Parse loop] Unexpected token", tokens[token_id]);
           break;
@@ -377,7 +482,7 @@ public:
   }
 
   // Parses an identifier assignment statement (e.g., x = expr;)
-  ASTNode* parseIdentifier() {
+  ASTNode* parseIdentifier(bool singleLineStatement = false) {
     std::string identifier = tokens[token_id].lexeme;
     int unique_id = table.GetUniqueId(identifier);
 
@@ -393,7 +498,7 @@ public:
     assignmentNode->SetLeft(variableNode);
     assignmentNode->SetRight(expressionNode);
 
-    if (tokens[token_id] != Lexer::ID_semicolon) {
+    if (tokens[token_id] != Lexer::ID_semicolon && !singleLineStatement) {
       Utils::error("Expected semicolon at end of expression", tokens[token_id]);
     }
     ++token_id;

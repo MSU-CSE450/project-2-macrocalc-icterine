@@ -20,7 +20,8 @@ enum Type {
   PRINT,             // Print statements
   STRING,            // String literals
   IF_STATEMENT,      // If statements
-  ELSE_STATEMENT     // Else statements
+  ELSE_STATEMENT,    // Else statements
+  WHILE_LOOP         // While loops
 };
 
 class ASTNode {
@@ -178,17 +179,28 @@ public:
 
       case IF_STATEMENT:
         lvalue = left->Run(symbols);
+
         if (lvalue != 0) {
           rvalue = right->Run(symbols);
         }
-        else if (elseBlock != nullptr)
-        {
+        else if (elseBlock != nullptr) {
           elseBlock->Run(symbols);
         }
+
         return 0;
 
       case ELSE_STATEMENT:
         rvalue = right->Run(symbols);
+        return 0;
+
+      case WHILE_LOOP:
+        lvalue = left->Run(symbols);
+
+        while (lvalue != 0) {
+          rvalue = right->Run(symbols);
+          lvalue = left->Run(symbols);
+        }
+
         return 0;
 
       default:
