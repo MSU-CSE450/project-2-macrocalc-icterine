@@ -10,7 +10,7 @@
 #include "ASTNode.hpp"
 #include "lexer.hpp"
 #include "SymbolTable.hpp"
-
+#include "Parser.hpp"
 
 int main(int argc, char * argv[])
 {
@@ -18,6 +18,8 @@ int main(int argc, char * argv[])
     std::cout << "Format: " << argv[0] << " [filename]" << std::endl;
     exit(1);
   }
+
+
 
   std::string filename = argv[1];
   
@@ -27,8 +29,17 @@ int main(int argc, char * argv[])
     exit(1);
   }
 
+
   // TO DO:  
   // PARSE input file to create Abstract Syntax Tree (AST).
   // EXECUTE the AST to run your program.
+
+  Parser parser(in_file);
+
   
+  //parser.print_tokens();
+  parser.Parse();
+  //parser.print_table();
+  
+  return 0;
 }
